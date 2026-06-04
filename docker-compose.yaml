@@ -1,0 +1,89 @@
+services:
+  # --- THE BACKEND ---
+  whois:
+    build: 
+      context: ./WHOIS
+      dockerfile: Dockerfile
+    image: whois:latest
+    container_name: whoisc
+    restart: always
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./WHOIS/.env
+
+  # --- THE FRONTEND ---
+  frontend:
+    build:
+      context: ./Front-End
+      dockerfile: Dockerfile
+    image: front-end:latest
+    container_name: frontend
+    restart: always
+    ports:
+      - "5173:5173"   # Example frontend port
+    # Frontend env comes from Front-End/.env at build time (Vite bakes VITE_* into the bundle)
+    depends_on:
+      - Kali
+
+  # --- WEB-CHECK SERVICE ---
+  web-check:
+    build:
+      context: ./web-check   # Ensure this path points to your web-check folder
+      dockerfile: Dockerfile
+    image: web-check:latest
+    container_name: web      # This matches your --name web flag
+    restart: always
+    ports:
+      - "3001:3001"      # Maps Host 3001 to Container 3001
+    env_file:
+      - ./web-check/.env
+
+  AI:
+    build:
+      context: ./AI   # Ensure this path points to your web-check folder
+      dockerfile: Dockerfile
+    image: ai:latest
+    container_name: aiws      # This matches your --name web flag
+    restart: always
+    ports:
+      - "3006:3006"
+    env_file:
+      - ./AI/.env
+
+  Kali:
+    build:
+      context: ./Docker   # Ensure this path points to your web-check folder
+      dockerfile: Dockerfile
+    image: kalinew:latest
+    container_name: kali      # This matches your --name web flag
+    restart: always
+    ports:
+      - "6080:6080"
+      - "5050:5050"
+
+  # Report:
+  #     build:
+  #       context: ./AI-Report   # Ensure this path points to your web-check folder
+  #       dockerfile: Dockerfile
+  #     image: report:latest
+  #     container_name: rprt      # This matches your --name web flag
+  #     restart: always
+  #     ports:
+  #       - "3002:3002"
+  #     env_file:
+  #       - ./AI-Report/.env
+
+  Recon:
+    build:
+      context: ./Recon   # Ensure this path points to your web-check folder
+      dockerfile: Dockerfile
+    image: recon:latest
+    container_name: rec      # This matches your --name web flag
+    restart: always
+    ports:
+      - "3003:3003"
+      - "3004:3004"
+      - "3005:3005"
+    env_file:
+      - ./Recon/.env
