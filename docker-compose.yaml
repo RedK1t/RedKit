@@ -26,7 +26,7 @@ services:
     depends_on:
       - Kali
 
-  # --- WEB-CHECK SERVICE ---
+  # --- WEB-CHECK SERVICE --
   web-check:
     build:
       context: ./web-check   # Ensure this path points to your web-check folder
