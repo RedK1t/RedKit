@@ -24,7 +24,7 @@ services:
       - "5173:5173"   # Example frontend port
     # Frontend env comes from Front-End/.env at build time (Vite bakes VITE_* into the bundle)
     depends_on:
-      - Kali
+      - orchestrator
 
   # --- WEB-CHECK SERVICE --
   web-check:
@@ -47,11 +47,39 @@ services:
     container_name: aiws      # This matches your --name web flag
     restart: always
     ports:
-      - "3006:3006"
+      - "3006:3006"   # Scanner WebSocket
+      - "3007:3007"   # Report REST API
     env_file:
       - ./AI/.env
 
+  # Per-user browser-container orchestrator.
+  # Creates/stops a dedicated Kali (noVNC + proxy) container per Supabase user.
+  # Mounts the host Docker socket so it can manage sibling containers.
+  orchestrator:
+    build:
+      context: ./Back-End
+      dockerfile: Dockerfile
+    image: orchestrator:latest
+    container_name: orchestrator
+    restart: always
+    ports:
+      - "3008:3008"   # control API
+      - "3009:3009"   # authenticated data gateway (only way into a container)
+    env_file:
+      - ./Back-End/.env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Join the private network the per-user containers use so the gateway can
+    # reach them by internal IP (containers no longer publish host ports).
+    networks:
+      - redkit-net
+
+  # The Kali browser/proxy image is now spawned per-user by the orchestrator,
+  # not run as a single shared instance. It stays here ONLY so the image gets
+  # built. The "manual" profile keeps `docker compose up` from starting it;
+  # build the image explicitly with:  docker compose build Kali
   Kali:
+    profiles: ["manual"]
     build:
       context: ./Docker   # Ensure this path points to your web-check folder
       dockerfile: Dockerfile
@@ -87,3 +115,56 @@ services:
       - "3005:3005"
     env_file:
       - ./Recon/.env
+
+  # --- STATIC LANDING PAGE ---
+  # Served at the apex domain ({domain}.{tld}) by Caddy in deployment.
+  # No host port published: Caddy reaches it as `landing:80` over the Docker
+  # network. For local preview run `cd Landing && npm run dev`.
+  # Set VITE_DASH_URL in Landing/.env (the dashboard's `dash.` subdomain) before
+  # building — Vite bakes it into the bundle at build time.
+  landing:
+    build:
+      context: ./Landing
+      dockerfile: Dockerfile
+    image: redkit-landing:latest
+    container_name: landing
+    restart: always
+
+  # --- REVERSE PROXY (Caddy) — COMMENTED OUT ---
+  # Enable this in deployment to serve every service on its own HTTPS subdomain
+  # (see ./Caddyfile and host.md §9). Steps:
+  #   1. Uncomment this service AND the `volumes:` block at the bottom.
+  #   2. Set DOMAIN below to your real domain.
+  #   3. Point `*.{DOMAIN}` (and the apex) DNS at the server IP.
+  #   4. `docker compose up -d` — Caddy auto-fetches Let's Encrypt certs.
+  # Caddy joins BOTH networks on purpose: the `default` compose network (to reach
+  # landing/frontend/aiws/rec/web/whoisc by name) and `redkit-net` (to reach the
+  # orchestrator, which lives only on redkit-net).
+  # caddy:
+  #   image: caddy:latest
+  #   container_name: caddy
+  #   restart: always
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   environment:
+  #     - DOMAIN=example.com
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile
+  #     - caddy_data:/data
+  #     - caddy_config:/config
+  #   networks:
+  #     - default
+  #     - redkit-net
+
+# Named volumes for Caddy's certificates/state — uncomment with the caddy service.
+# volumes:
+#   caddy_data:
+#   caddy_config:
+
+# Private network shared by the orchestrator and every per-user browser container.
+# Fixed `name:` so dockerode (which attaches containers by this literal name) and
+# compose agree. Must match DOCKER_NETWORK in Back-End/.env.
+networks:
+  redkit-net:
+    name: redkit-net

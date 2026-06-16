@@ -1,0 +1,72 @@
+# RedKit reverse proxy (Caddy) — per-service subdomains with automatic HTTPS.
+#
+# DOMAIN is injected from the root .env via the caddy service
+# (environment: [ "DOMAIN=${DOMAIN}" ]). Caddy fetches + renews Let's Encrypt
+# certs automatically on first request to each hostname.
+#
+# Targets are `container_name:port` reached over the Docker network, so the
+# proxied services publish NO host ports. WebSockets (scanner, gateway, recon)
+# are proxied transparently — no extra config needed.
+#
+# DNS: point the apex + each subdomain (or a `*` wildcard) at the server IP,
+# all DNS-only (grey cloud) in Cloudflare. See DNS-SETUP.md.
+
+# Email for Let's Encrypt expiry/recovery notices (optional but recommended).
+{
+	email admin@redkit.uk
+}
+
+# --- Landing page (apex + www) ---
+{$DOMAIN}, www.{$DOMAIN} {
+	reverse_proxy landing:80
+}
+
+# --- Dashboard (the Front-End app) ---
+dash.{$DOMAIN} {
+	reverse_proxy frontend:5173
+}
+
+# --- Orchestrator: control API ---
+api.{$DOMAIN} {
+	reverse_proxy orchestrator:3008
+}
+
+# --- Orchestrator: authenticated data gateway into per-user Kali containers ---
+gateway.{$DOMAIN} {
+	reverse_proxy orchestrator:3009
+}
+
+# --- AI vulnerability scanner (WebSocket) ---
+scanner.{$DOMAIN} {
+	reverse_proxy aiws:3006
+}
+
+# --- AI report REST API ---
+report.{$DOMAIN} {
+	reverse_proxy aiws:3007
+}
+
+# --- Reconnaissance: subdomain enumeration (WebSocket) ---
+recon.{$DOMAIN} {
+	reverse_proxy rec:3003
+}
+
+# --- Reconnaissance: open-ports scan ---
+ports.{$DOMAIN} {
+	reverse_proxy rec:3004
+}
+
+# --- Reconnaissance: endpoint discovery ---
+endpoints.{$DOMAIN} {
+	reverse_proxy rec:3005
+}
+
+# --- Web-check ---
+webcheck.{$DOMAIN} {
+	reverse_proxy web:3001
+}
+
+# --- WHOIS ---
+whois.{$DOMAIN} {
+	reverse_proxy whoisc:3000
+}

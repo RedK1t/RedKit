@@ -6,3 +6,11 @@ Proxy/
 Recon/
 web-check/
 WHOIS/
+Back-End/
+Landing/
+
+# Production secrets / artifacts — never commit these
+.env
+redkit_deploy
+redkit_deploy.pub
+RedKit-Deploy/

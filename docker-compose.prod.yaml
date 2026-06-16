@@ -1,0 +1,138 @@
+services:
+  # --- WHOIS lookup ---
+  whois:
+    build:
+      context: ./WHOIS
+      dockerfile: Dockerfile
+    image: whois:latest
+    container_name: whoisc
+    restart: always
+    env_file:
+      - ./WHOIS/.env
+
+  # --- Dashboard (Front-End) ---
+  # VITE_* are baked from Front-End/.env at build time (point them at the public
+  # subdomains before `docker compose build frontend`).
+  frontend:
+    build:
+      context: ./Front-End
+      dockerfile: Dockerfile
+    image: front-end:latest
+    container_name: frontend
+    restart: always
+    depends_on:
+      - orchestrator
+
+  # --- Web-check site analysis ---
+  web-check:
+    build:
+      context: ./web-check
+      dockerfile: Dockerfile
+    image: web-check:latest
+    container_name: web
+    restart: always
+    env_file:
+      - ./web-check/.env
+
+  # --- AI vulnerability scanner (3006 WS) + report REST API (3007) ---
+  AI:
+    build:
+      context: ./AI
+      dockerfile: Dockerfile
+    image: ai:latest
+    container_name: aiws
+    restart: always
+    env_file:
+      - ./AI/.env
+
+  # --- Per-user browser-container orchestrator ---
+  # Control API (3008) + authenticated data gateway (3009). Mounts the host Docker
+  # socket to spawn/stop per-user Kali containers. Lives only on redkit-net; Caddy
+  # (on both networks) is what exposes api./gateway. publicly.
+  orchestrator:
+    build:
+      context: ./Back-End
+      dockerfile: Dockerfile
+    image: orchestrator:latest
+    container_name: orchestrator
+    restart: always
+    env_file:
+      - ./Back-End/.env
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - redkit-net
+
+  # --- Kali browser/proxy image (spawned per-user by the orchestrator) ---
+  # Built once, never started by `docker compose up` (manual profile). Build with:
+  #   docker compose build Kali
+  Kali:
+    profiles: ["manual"]
+    build:
+      context: ./Docker
+      dockerfile: Dockerfile
+    image: kalinew:latest
+    container_name: kali
+    restart: always
+
+  # --- Reconnaissance (3003 subdomains WS, 3004 ports, 3005 endpoints) ---
+  Recon:
+    build:
+      context: ./Recon
+      dockerfile: Dockerfile
+    image: recon:latest
+    container_name: rec
+    restart: always
+    env_file:
+      - ./Recon/.env
+
+  # --- Static landing page (apex + www) ---
+  landing:
+    build:
+      context: ./Landing
+      dockerfile: Dockerfile
+    image: redkit-landing:latest
+    container_name: landing
+    restart: always
+
+  # --- Reverse proxy (Caddy) — the ONLY service exposed to the internet ---
+  # Serves every other service on its own HTTPS subdomain with automatic
+  # Let's Encrypt certs. DOMAIN comes from the root .env (DOMAIN=redkit.uk).
+  # Joins BOTH networks: `default` (to reach landing/frontend/aiws/rec/web/whoisc
+  # by name) and `redkit-net` (to reach the orchestrator).
+  caddy:
+    image: caddy:2
+    container_name: caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - default
+      - redkit-net
+    depends_on:
+      - landing
+      - frontend
+      - orchestrator
+      - AI
+      - Recon
+      - web-check
+      - whois
+
+# Caddy certificate/state storage (persists issued certs across restarts).
+volumes:
+  caddy_data:
+  caddy_config:
+
+# Private network shared by the orchestrator and every per-user browser container.
+# Fixed `name:` so dockerode (which attaches containers by this literal name) and
+# compose agree. Must match DOCKER_NETWORK in Back-End/.env.
+networks:
+  redkit-net:
+    name: redkit-net
