@@ -7,7 +7,12 @@
 set -euo pipefail
 
 cd /opt/redkit
-C="docker compose -f docker-compose.prod.yaml"
+
+# Run docker via sudo when we're not already root (manual runs by a sudo user);
+# when invoked by CI as root, sudo is skipped (it's unneeded and may be absent).
+SUDO=""
+[ "$(id -u)" -ne 0 ] && SUDO="sudo"
+C="$SUDO docker compose -f docker-compose.prod.yaml"
 
 case "${1:-orchestration}" in
   # Umbrella repo (compose / Caddyfile / this script changed): pull root, reconcile.
