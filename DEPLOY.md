@@ -115,7 +115,8 @@ P="docker compose -f docker-compose.prod.yaml"
 $P ps                       # status
 $P logs -f <service>        # frontend, aiws, orchestrator, caddy, rec, web, whoisc, landing
 $P up -d --build <service>  # manual redeploy of one service
-./deploy.sh Front-End       # what CI runs
+./deploy.sh Front-End       # what CI runs (pull + rebuild one service)
+./deploy.sh all             # pull ALL repos, build everything incl. Kali, start all except Kali
 ```
 
 ### Notes

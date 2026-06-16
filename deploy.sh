@@ -13,6 +13,19 @@ case "${1:-orchestration}" in
   # Umbrella repo (compose / Caddyfile / this script changed): pull root, reconcile.
   orchestration) git pull --ff-only; $C up -d ;;
 
+  # Full update: pull every repo, build ALL images (including Kali), then start
+  # everything EXCEPT Kali (Kali stays on the manual profile — it's launched
+  # per-user by the orchestrator, never run as a standing service).
+  all)
+    git pull --ff-only
+    for r in Front-End Landing AI Back-End Recon web-check WHOIS Docker; do
+      echo "== pulling $r =="
+      git -C "$r" pull --ff-only
+    done
+    $C --profile manual build     # build all services + the Kali image
+    $C up -d                      # start all default services (Kali excluded)
+    ;;
+
   Front-End) git -C Front-End pull --ff-only; $C up -d --build frontend ;;
   Landing)   git -C Landing   pull --ff-only; $C up -d --build landing ;;
   AI)        git -C AI        pull --ff-only; $C up -d --build AI ;;
