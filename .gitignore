@@ -17,3 +17,4 @@ RedKit-Deploy/
 # Local-only docs, papers, CD build (never pushed)
 Private-Docs/
 RedKit-CD/
+.directory
