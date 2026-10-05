@@ -14,3 +14,6 @@ Landing/
 redkit_deploy
 redkit_deploy.pub
 RedKit-Deploy/
+# Local-only docs, papers, CD build (never pushed)
+Private-Docs/
+RedKit-CD/
